@@ -34,3 +34,4 @@ export const regexToNFA = (regex) => post("/automata/regex-to-nfa", { regex });
 export const nfaToDFA = (automata) => post("/automata/nfa-to-dfa", { automata });
 export const minimizeDFA = (dfa) => post("/automata/minimize-dfa", dfa);
 export const tokenize = (input) => post("/lexer/tokenize", { input });
+export const parseTree = (tokens) => post("/parser/parse-tree", { tokens });

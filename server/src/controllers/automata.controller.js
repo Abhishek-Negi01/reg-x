@@ -1,6 +1,10 @@
 import { regexToNFA } from "../algorithms/automata/thompson.js";
 import { formatNFA } from "../utils/formatAutomata.js";
 import { nfaToDFA } from "../algorithms/automata/subset.js";
+import {
+  removeUnreachableStates,
+  removeDuplicateTransitions,
+} from "../algorithms/automata/optimizeNFA.js";
 
 export const testAutomata = (req, res) => {
   res.status(200).json({
@@ -13,7 +17,10 @@ import { automataToGraph } from "../utils/graphFormatter.js";
 export const convertRegex = (req, res) => {
   const { regex } = req.body;
 
-  const nfa = regexToNFA(regex);
+  let nfa = regexToNFA(regex);
+  nfa = removeUnreachableStates(nfa);
+  nfa = removeDuplicateTransitions(nfa);
+
   const formatted = formatNFA(nfa);
   const graph = automataToGraph(formatted);
 

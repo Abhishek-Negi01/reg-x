@@ -1,63 +1,55 @@
-import { simulateLexerDFA } from "./dfaSimulator.js";
+import { buildTokenDFAs } from "./buildTokenDFAs.js";
+import { runDFA } from "./dfaSimulator.js";
+
+const TOKEN_DFAS = buildTokenDFAs();
 
 export const tokenize = (input) => {
-  const KEYWORDS = ["if", "else", "while", "return"];
   let tokens = [];
-  let allSteps = [];
   let errors = [];
   let i = 0;
 
   while (i < input.length) {
     let ch = input[i];
 
-    if (ch === " ") {
+    // skip whitespace
+    if (/\s/.test(ch)) {
       i++;
       continue;
     }
 
-    const result = simulateLexerDFA(input, i);
+    let bestMatch = null;
 
-    if (result) {
+    for (let token of TOKEN_DFAS) {
+      const result = runDFA(token.dfa, input, i);
+
+      if (result) {
+        if (
+          !bestMatch ||
+          result.value.length > bestMatch.value.length ||
+          (result.value.length === bestMatch.value.length &&
+            token.priority < bestMatch.priority)
+        ) {
+          bestMatch = {
+            type: token.type,
+            value: result.value,
+            nextIndex: result.nextIndex,
+            priority: token.priority,
+          };
+        }
+      }
+    }
+
+    if (bestMatch) {
       tokens.push({
-        type: KEYWORDS.includes(result.value) ? "KEYWORD" : "IDENTIFIER",
-        value: result.value,
+        type: bestMatch.type,
+        value: bestMatch.value,
       });
 
-      allSteps.push({
-        token: result.value,
-        steps: result.steps,
-      });
-
-      i = result.nextIndex;
+      i = bestMatch.nextIndex;
       continue;
     }
 
-    // operators
-    if (ch === "+") {
-      tokens.push({ type: "PLUS", value: "+" });
-      i++;
-      continue;
-    }
-
-    if (ch === "*") {
-      tokens.push({ type: "MULTIPLY", value: "*" });
-      i++;
-      continue;
-    }
-
-    if (ch === "(") {
-      tokens.push({ type: "LPAREN", value: "(" });
-      i++;
-      continue;
-    }
-
-    if (ch === ")") {
-      tokens.push({ type: "RPAREN", value: ")" });
-      i++;
-      continue;
-    }
-
-    // tokens.push({ type: "UNKNOWN", value: ch });
+    //  error
     tokens.push({
       type: "ERROR",
       value: ch,
@@ -76,7 +68,6 @@ export const tokenize = (input) => {
   return {
     success: errors.length === 0,
     tokens,
-    steps: allSteps,
     errors,
   };
 };

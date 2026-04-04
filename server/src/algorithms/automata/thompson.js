@@ -61,32 +61,73 @@ const kleene = (nfa) => {
   };
 };
 
-// MAIN FUNCTION (very basic parsing for now)
-import { addConcatOperator, infixToPostfix } from "./regexParser.js";
+const plus = (nfa) => {
+  const start = newState();
+  const end = newState();
+
+  return {
+    start,
+    end,
+    transitions: {
+      [start]: { ε: [nfa.start] },
+      ...nfa.transitions,
+      [nfa.end]: { ε: [nfa.start, end] },
+    },
+  };
+};
+
+const optional = (nfa) => {
+  const start = newState();
+  const end = newState();
+
+  return {
+    start,
+    end,
+    transitions: {
+      [start]: { ε: [nfa.start, end] },
+      ...nfa.transitions,
+      [nfa.end]: { ε: [end] },
+    },
+  };
+};
+import {
+  tokenizeRegex,
+  addConcat,
+  toPostfix,
+  expandCharClass,
+} from "./regexParser.js";
 
 export const regexToNFA = (regex) => {
   stateCount = 0;
 
-  const withConcat = addConcatOperator(regex);
-  const postfix = infixToPostfix(withConcat);
+  const tokens = tokenizeRegex(regex);
+  const withConcat = addConcat(tokens);
+  const postfix = toPostfix(withConcat);
 
-  console.log("Postfix:", postfix); // debug
+  // console.log("Postfix:", postfix); // debug
 
   const stack = [];
 
-  for (let char of postfix) {
-    if (char === "*") {
-      stack.push(kleene(stack.pop()));
-    } else if (char === ".") {
-      const nfa2 = stack.pop();
-      const nfa1 = stack.pop();
-      stack.push(concatenate(nfa1, nfa2));
-    } else if (char === "|") {
-      const nfa2 = stack.pop();
-      const nfa1 = stack.pop();
-      stack.push(union(nfa1, nfa2));
+  for (let token of postfix) {
+    if (token.type === "LITERAL") {
+      stack.push(createSymbolNFA(token.value));
+    } else if (token.type === "CHAR_CLASS") {
+      stack.push(createCharClassNFA(token.value)); //  no expansion
     } else {
-      stack.push(createSymbolNFA(char));
+      const op = token.value;
+
+      if (op === "*") stack.push(kleene(stack.pop()));
+      else if (op === "+") stack.push(plus(stack.pop()));
+      else if (op === "?") stack.push(optional(stack.pop()));
+      else if (op === ".") {
+        const b = stack.pop();
+        const a = stack.pop();
+        stack.push(concatenate(a, b));
+      } else if (op === "|") {
+        const b = stack.pop();
+        const a = stack.pop();
+        stack.push(union(a, b));
+      }
     }
   }
 
@@ -96,5 +137,18 @@ export const regexToNFA = (regex) => {
     startState: result.start,
     acceptStates: [result.end],
     transitions: result.transitions,
+  };
+};
+
+const createCharClassNFA = (charClass) => {
+  const start = newState();
+  const end = newState();
+
+  return {
+    start,
+    end,
+    transitions: {
+      [start]: { [charClass]: [end] }, //  single transition
+    },
   };
 };

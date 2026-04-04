@@ -1,155 +1,129 @@
 import { useState } from "react";
 import TokenViewer from "../components/TokenViewer";
+import StepVisualizer from "../components/StepVisualizer";
 import * as api from "../services/api";
 
 const EXAMPLES = ["if abc + while", "x + y * (z)", "hello world return"];
 
 export default function LexerPage() {
-  const [input, setInput] = useState("");
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [input,      setInput]      = useState("");
+  const [result,     setResult]     = useState(null);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
   const [activeStep, setActiveStep] = useState(null);
 
   async function handleTokenize() {
     if (!input.trim()) return;
-    setError("");
-    setResult(null);
-    setActiveStep(null);
-    setLoading(true);
-    try {
-      const res = await api.tokenize(input);
-      setResult(res);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    setError(""); setResult(null); setActiveStep(null); setLoading(true);
+    try { setResult(await api.tokenize(input)); }
+    catch (e) { setError(e.message); }
+    finally   { setLoading(false); }
   }
 
+  function reset() { setInput(""); setResult(null); setActiveStep(null); setError(""); }
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white mb-1">Lexer Simulator</h1>
-        <p className="text-gray-400 text-sm">Tokenize source code and inspect DFA transitions step by step</p>
+    <div className="page">
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 32 }}>
+        <div>
+          <h1 style={{ marginBottom: 8 }}>Lexer Simulator</h1>
+          <p style={{ fontSize: 14 }}>Tokenize source code and animate DFA transitions character by character</p>
+        </div>
+        {result && <button className="btn btn-ghost btn-sm" onClick={reset}>↺ Reset</button>}
       </div>
 
-      {/* Input */}
-      <div className="space-y-2">
+      {/* Input card */}
+      <div className="card" style={{ padding: 24, marginBottom: 20 }}>
+        <span className="label" style={{ marginBottom: 12 }}>Source Input</span>
         <textarea
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
-          rows={3}
-          placeholder="Enter source code to tokenize..."
+          className="rx-input"
+          rows={3} style={{ resize: "none" }}
+          placeholder="Enter source code to tokenize…"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={e => setInput(e.target.value)}
         />
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex}
-                onClick={() => setInput(ex)}
-                className="px-2.5 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-md transition-colors font-mono"
-              >
-                {ex}
-              </button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "#6B7280" }}>Try:</span>
+            {EXAMPLES.map(ex => (
+              <button key={ex} className="chip" onClick={() => setInput(ex)}>{ex}</button>
             ))}
           </div>
-          <button
-            onClick={handleTokenize}
-            disabled={loading || !input.trim()}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            {loading ? "Tokenizing..." : "Tokenize"}
+          <button className="btn btn-primary"
+            onClick={handleTokenize} disabled={loading || !input.trim()}>
+            {loading ? <><span className="spinner" />Tokenizing…</> : "Tokenize"}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-300">
-          {error}
+        <div className="banner banner-error anim-fade-in" style={{ marginBottom: 20 }}>
+          <span style={{ flexShrink: 0 }}>⚠</span> {error}
         </div>
       )}
 
       {result && (
-        <div className="space-y-6">
-          {/* Status banner */}
-          <div
-            className={`rounded-lg px-4 py-2.5 text-sm font-medium border ${
-              result.success
-                ? "bg-emerald-950 border-emerald-800 text-emerald-300"
-                : "bg-yellow-950 border-yellow-800 text-yellow-300"
-            }`}
-          >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }} className="anim-fade-up">
+
+          {/* Status */}
+          <div className={`banner ${result.success ? "banner-success" : "banner-warning"}`}>
+            <span style={{ flexShrink: 0 }}>{result.success ? "✓" : "⚠"}</span>
             {result.success
-              ? `✓ Tokenized successfully — ${result.tokens.length} tokens`
-              : `⚠ Tokenized with ${result.errors.length} error(s) — ${result.tokens.length} tokens`}
+              ? `Tokenized successfully — ${result.tokens.length} token${result.tokens.length !== 1 ? "s" : ""}`
+              : `Tokenized with ${result.errors.length} error(s) — ${result.tokens.length} tokens`}
           </div>
 
-          <TokenViewer tokens={result.tokens} errors={result.errors} />
+          {/* Tokens */}
+          <div className="card" style={{ padding: 24 }}>
+            <TokenViewer tokens={result.tokens} errors={result.errors} />
+          </div>
 
           {/* DFA Steps */}
           {result.steps?.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-xs text-gray-400 uppercase tracking-widest">DFA Simulation Steps</p>
-              <div className="flex flex-wrap gap-2">
+            <div className="card" style={{ padding: 24 }}>
+              <span className="label" style={{ marginBottom: 14 }}>DFA Simulation</span>
+              <p style={{ fontSize: 13, marginBottom: 14 }}>Select a token to animate its DFA traversal:</p>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
                 {result.steps.map((s, i) => (
-                  <button
-                    key={i}
+                  <button key={i}
                     onClick={() => setActiveStep(activeStep === i ? null : i)}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-semibold transition-colors ${
-                      activeStep === i
-                        ? "bg-indigo-700 border-indigo-500 text-white"
-                        : "bg-gray-800 border-gray-700 text-gray-300 hover:border-indigo-600"
-                    }`}
+                    style={{
+                      padding: "7px 16px", borderRadius: 8,
+                      border: `1px solid ${activeStep === i ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.08)"}`,
+                      background: activeStep === i ? "#1F2937" : "#1F2937",
+                      color: activeStep === i ? "#A5B4FC" : "#9CA3AF",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 13, fontWeight: 600, cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { if (activeStep !== i) { e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)"; e.currentTarget.style.color = "#E5E7EB"; }}}
+                    onMouseLeave={e => { if (activeStep !== i) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#9CA3AF"; }}}
                   >
-                    &quot;{s.token}&quot;
+                    "{s.token}"
                   </button>
                 ))}
               </div>
 
-              {activeStep !== null && result.steps[activeStep] && (
-                <StepDetail step={result.steps[activeStep]} input={input} />
+              {activeStep !== null && result.steps[activeStep]?.steps?.length > 0 && (
+                <div className="anim-scale-in">
+                  <StepVisualizer steps={result.steps[activeStep].steps} />
+                </div>
               )}
             </div>
           )}
         </div>
       )}
-    </div>
-  );
-}
 
-function StepDetail({ step, input }) {
-  return (
-    <div className="rounded-xl border border-gray-700 bg-gray-900 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-gray-700 bg-gray-800 flex items-center justify-between">
-        <span className="text-sm font-semibold text-white font-mono">&quot;{step.token}&quot;</span>
-        <span className="text-xs text-gray-400">{step.steps.length} transitions</span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs font-mono">
-          <thead>
-            <tr className="text-gray-500 border-b border-gray-800">
-              <th className="px-4 py-2 text-left font-medium">#</th>
-              <th className="px-4 py-2 text-left font-medium">State</th>
-              <th className="px-4 py-2 text-left font-medium">Char</th>
-              <th className="px-4 py-2 text-left font-medium">Next State</th>
-            </tr>
-          </thead>
-          <tbody>
-            {step.steps.map((s, i) => (
-              <tr key={i} className="border-b border-gray-800 hover:bg-gray-800 transition-colors">
-                <td className="px-4 py-2 text-gray-500">{i + 1}</td>
-                <td className="px-4 py-2 text-indigo-300">{s.state}</td>
-                <td className="px-4 py-2">
-                  <span className="px-1.5 py-0.5 bg-gray-700 rounded text-yellow-300">{s.char}</span>
-                </td>
-                <td className="px-4 py-2 text-emerald-300">{s.nextState ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {!result && !loading && (
+        <div className="empty-state">
+          <span className="empty-state-icon">◈</span>
+          <p className="empty-state-title">Enter source code to tokenize</p>
+          <p className="empty-state-sub">Recognizes identifiers, keywords, operators (+, *), and parentheses.</p>
+        </div>
+      )}
     </div>
   );
 }

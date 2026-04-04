@@ -1,11 +1,29 @@
 export const minimizeDFA = (dfa) => {
-  const { states, alphabet, transitions, startState, acceptStates } = dfa;
+  let { states, alphabet, transitions, startState, acceptStates } = dfa;
 
-  // Step 1: Initial partition
+  //  STEP 0: REMOVE unreachable states (including dead if unused)
+  const visited = new Set();
+  const stack = [startState];
+
+  while (stack.length) {
+    const s = stack.pop();
+    if (visited.has(s)) continue;
+
+    visited.add(s);
+
+    for (let sym of alphabet) {
+      const next = transitions[s]?.[sym];
+      if (next) stack.push(next);
+    }
+  }
+
+  states = states.filter((s) => visited.has(s));
+
+  //  STEP 1: Initial partition (REMOVE empty sets)
   let partitions = [
-    new Set(acceptStates),
+    new Set(acceptStates.filter((s) => states.includes(s))),
     new Set(states.filter((s) => !acceptStates.includes(s))),
-  ];
+  ].filter((set) => set.size > 0); // ✅ FIX
 
   let changed = true;
 
@@ -22,7 +40,6 @@ export const minimizeDFA = (dfa) => {
         for (let symbol of alphabet) {
           const next = transitions[state]?.[symbol];
 
-          // find which partition next belongs to
           let index = partitions.findIndex((p) => p.has(next));
           key += index + "|";
         }
@@ -40,37 +57,38 @@ export const minimizeDFA = (dfa) => {
     partitions = newPartitions;
   }
 
-  // Step 3: Build minimized DFA
+  //  STEP 2: Build minimized DFA (SAFE)
   const stateMap = {};
-  partitions.forEach((group, index) => {
-    for (let state of group) {
-      stateMap[state] = `M${index}`;
-    }
-  });
-
   const newTransitions = {};
 
   partitions.forEach((group, index) => {
-    const rep = [...group][0];
-    const newState = `M${index}`;
+    const name = `M${index}`;
 
+    for (let state of group) {
+      stateMap[state] = name;
+    }
+  });
+
+  partitions.forEach((group, index) => {
+    const rep = [...group][0];
+    if (!rep) return; // ✅ safety
+
+    const newState = `M${index}`;
     newTransitions[newState] = {};
 
     for (let symbol of alphabet) {
       const next = transitions[rep]?.[symbol];
-      if (next) {
+      if (next && stateMap[next]) {
         newTransitions[newState][symbol] = stateMap[next];
       }
     }
   });
 
-  const newStates = Object.values(stateMap).filter(
-    (v, i, a) => a.indexOf(v) === i,
-  );
-
+  const newStates = [...new Set(Object.values(stateMap))];
   const newStart = stateMap[startState];
-
-  const newAccept = [...new Set(acceptStates.map((s) => stateMap[s]))];
+  const newAccept = [
+    ...new Set(acceptStates.filter((s) => stateMap[s]).map((s) => stateMap[s])),
+  ];
 
   return {
     states: newStates,

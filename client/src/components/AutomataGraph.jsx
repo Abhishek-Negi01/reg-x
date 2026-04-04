@@ -10,16 +10,56 @@ import "reactflow/dist/style.css";
 import { useEffect } from "react";
 import StateNode from "./StateNode";
 
-// Stable reference — defined at module scope in a file with no other state
 const nodeTypes = { state: StateNode };
 
-function layoutNodes(nodes) {
-  const cols = Math.ceil(Math.sqrt(nodes.length)) || 1;
-  return nodes.map((n, i) => ({
-    id: n.id,
-    type: "state",
-    data: n.data,
-    position: { x: (i % cols) * 200, y: Math.floor(i / cols) * 140 },
+const NODE_W = 100;
+const NODE_H  = 44;
+const H_GAP   = 90;
+const V_GAP   = 90;
+
+function layoutNodes(rawNodes, rawEdges) {
+  if (!rawNodes.length) return [];
+
+  const adj = {};
+  rawNodes.forEach((n) => { adj[n.id] = []; });
+  rawEdges.forEach((e) => { if (adj[e.source]) adj[e.source].push(e.target); });
+
+  const startNode = rawNodes.find((n) => n.data?.isStart) || rawNodes[0];
+  const layer = {};
+  const queue = [startNode.id];
+  layer[startNode.id] = 0;
+
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const next of (adj[cur] || [])) {
+      if (layer[next] === undefined && next !== cur) {
+        layer[next] = layer[cur] + 1;
+        queue.push(next);
+      }
+    }
+  }
+  rawNodes.forEach((n) => { if (layer[n.id] === undefined) layer[n.id] = 0; });
+
+  const byLayer = {};
+  rawNodes.forEach((n) => {
+    const l = layer[n.id];
+    if (!byLayer[l]) byLayer[l] = [];
+    byLayer[l].push(n.id);
+  });
+
+  const pos = {};
+  Object.entries(byLayer).forEach(([l, ids]) => {
+    const x = Number(l) * (NODE_W + H_GAP);
+    const totalH = ids.length * NODE_H + (ids.length - 1) * V_GAP;
+    const startY = -totalH / 2;
+    ids.forEach((id, i) => {
+      pos[id] = { x, y: startY + i * (NODE_H + V_GAP) };
+    });
+  });
+
+  return rawNodes.map((n) => ({
+    id: n.id, type: "state", data: n.data,
+    position: pos[n.id] || { x: 0, y: 0 },
   }));
 }
 
@@ -30,51 +70,87 @@ function buildEdges(rawEdges) {
     if (!map[key]) map[key] = { source: e.source, target: e.target, label: e.label };
     else map[key].label += `, ${e.label}`;
   });
+
   return Object.values(map).map((e) => ({
     id: `${e.source}-${e.target}`,
     source: e.source,
     target: e.target,
     label: e.label,
-    labelStyle: { fill: "#d1d5db", fontSize: 12 },
-    labelBgStyle: { fill: "#111827", fillOpacity: 0.85 },
-    style: { stroke: "#6b7280" },
-    markerEnd: { type: MarkerType.ArrowClosed, color: "#6b7280" },
+    type: e.source === e.target ? "selfConnecting" : "default",
+    labelStyle: {
+      fill: "#f1f5f9",
+      fontSize: 12,
+      fontWeight: 700,
+      fontFamily: "'JetBrains Mono', monospace",
+    },
+    labelBgStyle: { fill: "#1e293b", fillOpacity: 1, rx: 4 },
+    labelBgPadding: [5, 8],
+    style: { stroke: "#94a3b8", strokeWidth: 2 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8", width: 18, height: 18 },
   }));
 }
 
 export default function AutomataGraph({ nodes: rawNodes, edges: rawEdges }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(() => layoutNodes(rawNodes));
+  const [nodes, setNodes, onNodesChange] = useNodesState(() => layoutNodes(rawNodes, rawEdges));
   const [edges, setEdges, onEdgesChange] = useEdgesState(() => buildEdges(rawEdges));
 
   useEffect(() => {
-    setNodes(layoutNodes(rawNodes));
+    setNodes(layoutNodes(rawNodes, rawEdges));
     setEdges(buildEdges(rawEdges));
   }, [rawNodes, rawEdges]);
 
   return (
-    <div style={{ height: 420, background: "#111827", borderRadius: 12 }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.3 }}
-      >
-        <Background color="#374151" gap={20} />
-        <Controls />
-        <MiniMap nodeColor={() => "#6366f1"} style={{ background: "#1f2937" }} />
-      </ReactFlow>
-      <div className="flex gap-4 px-3 py-2 text-xs text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#6366f1" }} /> Start
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full inline-block" style={{ background: "#10b981" }} /> Accept
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#f59e0b" }} /> Start+Accept
+    <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #1e293b" }}>
+      {/* Canvas — use #111827 (not pure black) so nodes are visible */}
+      <div style={{ height: 480, background: "#111827" }}>
+        <ReactFlow
+          nodes={nodes} edges={edges}
+          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
+          fitView fitViewOptions={{ padding: 0.35 }}
+          minZoom={0.25} maxZoom={2.5}
+        >
+          <Background color="#1e293b" gap={28} size={1} />
+          <Controls />
+          <MiniMap
+            nodeColor={(n) =>
+              n.data?.isStart && n.data?.isAccept ? "#fbbf24"
+              : n.data?.isStart  ? "#818cf8"
+              : n.data?.isAccept ? "#34d399"
+              : "#64748b"
+            }
+            maskColor="rgba(0,0,0,0.6)"
+            style={{ background: "#0f172a", border: "1px solid #1e293b" }}
+          />
+        </ReactFlow>
+      </div>
+
+      {/* Legend */}
+      <div style={{
+        display: "flex", flexWrap: "wrap", gap: 16,
+        padding: "10px 16px",
+        background: "#0f172a",
+        borderTop: "1px solid #1e293b",
+        fontSize: 12, color: "#94a3b8",
+      }}>
+        {[
+          { bg: "#3730a3", border: "#818cf8", label: "Start state",       dashed: true  },
+          { bg: "#065f46", border: "#34d399", label: "Accept state",      dashed: false },
+          { bg: "#92400e", border: "#fbbf24", label: "Start + Accept",    dashed: true  },
+          { bg: "#1e293b", border: "#64748b", label: "Normal state",      dashed: false },
+        ].map(({ bg, border, label, dashed }) => (
+          <span key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{
+              width: 14, height: 14, borderRadius: 4,
+              background: bg,
+              border: `2px ${dashed ? "dashed" : "solid"} ${border}`,
+              flexShrink: 0,
+            }} />
+            {label}
+          </span>
+        ))}
+        <span style={{ marginLeft: "auto", fontStyle: "italic", color: "#475569" }}>
+          Drag · scroll to zoom
         </span>
       </div>
     </div>

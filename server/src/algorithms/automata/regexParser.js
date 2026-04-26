@@ -90,7 +90,7 @@ export const expandCharClass = (token) => {
   return result;
 };
 
-// 🔥 TOKENIZER
+//  TOKENIZER
 export const tokenizeRegex = (regex) => {
   const tokens = [];
 

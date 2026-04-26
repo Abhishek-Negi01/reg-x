@@ -51,3 +51,20 @@ export const minimize = (req, res) => {
 
   res.json(minimized);
 };
+
+import { generateCodeFromDFA } from "../algorithms/automata/generateCode.js";
+
+export const generateCode = (req, res) => {
+  const dfa = req.body;
+
+  if (!dfa || !dfa.transitions) {
+    return res.status(400).json({ error: "Invalid DFA" });
+  }
+
+  const code = generateCodeFromDFA(dfa);
+
+  res.json({
+    success: true,
+    code,
+  });
+};

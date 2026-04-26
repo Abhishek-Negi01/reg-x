@@ -23,7 +23,7 @@ export const minimizeDFA = (dfa) => {
   let partitions = [
     new Set(acceptStates.filter((s) => states.includes(s))),
     new Set(states.filter((s) => !acceptStates.includes(s))),
-  ].filter((set) => set.size > 0); // ✅ FIX
+  ].filter((set) => set.size > 0); //  FIX
 
   let changed = true;
 
@@ -71,7 +71,7 @@ export const minimizeDFA = (dfa) => {
 
   partitions.forEach((group, index) => {
     const rep = [...group][0];
-    if (!rep) return; // ✅ safety
+    if (!rep) return; //  safety
 
     const newState = `M${index}`;
     newTransitions[newState] = {};

@@ -1,11 +1,18 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-const NON_TERMINALS = new Set(["E", "E'", "T", "T'", "F"]);
+/* Dynamically detect non-terminals: nodes that have children */
+function collectNonTerminals(node, set = new Set()) {
+  if (node.children?.length) {
+    set.add(node.value);
+    node.children.forEach(c => collectNonTerminals(c, set));
+  }
+  return set;
+}
 
-function nodeScheme(value) {
+function nodeScheme(value, nonTerminals) {
   if (value === "ε") return { fill: "#1F2937", stroke: "#6B7280", text: "#9CA3AF" };
-  if (NON_TERMINALS.has(value)) return { fill: "#3730A3", stroke: "#818CF8", text: "#fff" };
+  if (nonTerminals.has(value)) return { fill: "#3730A3", stroke: "#818CF8", text: "#fff" };
   return { fill: "#065F46", stroke: "#34D399", text: "#fff" };
 }
 
@@ -22,6 +29,7 @@ export default function ParseTreeGraph({ tree }) {
   useEffect(() => {
     if (!tree) return;
 
+    const nonTerminals = collectNonTerminals(tree);
     const root = d3.hierarchy(toHierarchy(tree));
     const depth     = root.height;
     const leafCount = root.leaves().length;
@@ -69,7 +77,7 @@ export default function ParseTreeGraph({ tree }) {
 
     /* ── nodes ── */
     root.descendants().forEach(d => {
-      const sc = nodeScheme(d.data.name);
+      const sc = nodeScheme(d.data.name, nonTerminals);
       const label = d.data.name;
       const tw = Math.max(label.length * 9 + 24, 44);
       const ng = g.append("g").attr("transform", `translate(${d.x},${d.y})`);

@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import AutomataPage from "./pages/AutomataPage";
 import LexerPage from "./pages/LexerPage";
 import ParserPage from "./pages/ParserPage";
+import FullParserPage from "./pages/FullParserPage";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
             <Route path="/automata" element={<AutomataPage />} />
             <Route path="/lexer" element={<LexerPage />} />
             <Route path="/parser" element={<ParserPage />} />
+            <Route path="/ll1" element={<FullParserPage />} />
           </Routes>
         </main>
       </div>

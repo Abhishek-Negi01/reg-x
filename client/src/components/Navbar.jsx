@@ -5,6 +5,7 @@ const LINKS = [
   { to: "/automata", label: "Automata" },
   { to: "/lexer",    label: "Lexer"    },
   { to: "/parser",   label: "Parser"   },
+  { to: "/ll1",      label: "LL(1)"    },
 ];
 
 export default function Navbar() {

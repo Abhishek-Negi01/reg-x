@@ -1,5 +1,7 @@
 import { useState } from "react";
 import AutomataGraph from "../components/AutomataGraph";
+import CodeBlock from "../components/CodeBlock";
+import { motion, AnimatePresence } from "framer-motion";
 import * as api from "../services/api";
 import { automataToGraph } from "../services/api";
 
@@ -13,20 +15,25 @@ const STEP_META = {
 };
 
 export default function AutomataPage() {
-  const [regex,    setRegex]    = useState("");
-  const [step,     setStep]     = useState(-1);
-  const [graphs,   setGraphs]   = useState({});
-  const [automata, setAutomata] = useState({});
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [regex,       setRegex]       = useState("");
+  const [step,        setStep]        = useState(-1);
+  const [graphs,      setGraphs]      = useState({});
+  const [automata,    setAutomata]    = useState({});
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState("");
+  const [genCode,     setGenCode]     = useState("");
+  const [codeLoading, setCodeLoading] = useState(false);
 
   const activeGraph = step >= 0 ? graphs[STEPS[step]] : null;
 
-  function reset() { setRegex(""); setStep(-1); setGraphs({}); setAutomata({}); setError(""); }
+  function reset() {
+    setRegex(""); setStep(-1); setGraphs({}); setAutomata({});
+    setError(""); setGenCode("");
+  }
 
   async function handleGenerate() {
     if (!regex.trim()) return;
-    setError(""); setLoading(true); setGraphs({}); setAutomata({}); setStep(-1);
+    setError(""); setLoading(true); setGraphs({}); setAutomata({}); setStep(-1); setGenCode("");
     try {
       const res = await api.regexToNFA(regex.trim());
       setGraphs({ NFA: res.graph });
@@ -52,10 +59,24 @@ export default function AutomataPage() {
     try {
       const res = await api.minimizeDFA(automata.DFA);
       setGraphs(g => ({ ...g, "Minimized DFA": automataToGraph(res) }));
+      setAutomata(a => ({ ...a, "Minimized DFA": res }));
       setStep(2);
     } catch (e) { setError(e.message); }
     finally     { setLoading(false); }
   }
+
+  async function handleGenerateCode() {
+    const dfa = automata["Minimized DFA"] || automata.DFA;
+    if (!dfa) return;
+    setError(""); setCodeLoading(true); setGenCode("");
+    try {
+      const res = await api.generateCode(dfa);
+      setGenCode(res.code);
+    } catch (e) { setError(e.message); }
+    finally     { setCodeLoading(false); }
+  }
+
+  const canGenerateCode = !!(automata["Minimized DFA"] || automata.DFA);
 
   return (
     <div className="page">
@@ -145,6 +166,11 @@ export default function AutomataPage() {
                   {loading ? <><span className="spinner" />Minimizing…</> : "Minimize DFA"}
                 </button>
               )}
+              {canGenerateCode && (
+                <button className="btn btn-cyan btn-sm" onClick={handleGenerateCode} disabled={codeLoading}>
+                  {codeLoading ? <><span className="spinner" />Generating…</> : "⟨/⟩ Generate Code"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -175,6 +201,33 @@ export default function AutomataPage() {
           <AutomataGraph nodes={activeGraph.nodes} edges={activeGraph.edges} />
         </div>
       )}
+
+      {/* Code generation output */}
+      <AnimatePresence>
+        {genCode && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{ marginTop: 24 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#06B6D4", flexShrink: 0 }} />
+                <span style={{ fontWeight: 700, fontSize: 14, color: "#F9FAFB" }}>Generated Recognizer</span>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
+                  background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.3)",
+                  color: "#67E8F9",
+                }}>JavaScript</span>
+              </div>
+              <button className="btn btn-ghost btn-xs" onClick={() => setGenCode("")}>✕ Close</button>
+            </div>
+            <CodeBlock code={genCode} filename="recognizer.js" />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Empty state */}
       {step === -1 && !loading && (

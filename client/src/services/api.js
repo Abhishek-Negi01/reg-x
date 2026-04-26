@@ -33,5 +33,8 @@ export function automataToGraph(automata) {
 export const regexToNFA = (regex) => post("/automata/regex-to-nfa", { regex });
 export const nfaToDFA = (automata) => post("/automata/nfa-to-dfa", { automata });
 export const minimizeDFA = (dfa) => post("/automata/minimize-dfa", dfa);
+export const generateCode = (dfa) => post("/automata/generate-code", dfa);
 export const tokenize = (input) => post("/lexer/tokenize", { input });
 export const parseTree = (tokens) => post("/parser/parse-tree", { tokens });
+export const fullParserPipeline = (tokens, grammar, startSymbol) =>
+  post("/parser/full", { tokens, grammar, startSymbol });

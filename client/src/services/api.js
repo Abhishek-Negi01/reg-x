@@ -1,14 +1,15 @@
+import axios from "axios";
+
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
+const api = axios.create({
+  baseURL: BASE,
+  headers: { "Content-Type": "application/json" },
+});
+
 async function post(url, body) {
-  const res = await fetch(`${BASE}${url}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || "Request failed");
-  return data;
+  const res = await api.post(url, body);
+  return res.data;
 }
 
 // Build a React Flow graph from a flat automata object (client-side)

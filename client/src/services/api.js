@@ -16,7 +16,11 @@ export function automataToGraph(automata) {
   const { states, transitions, startState, acceptStates } = automata;
   const nodes = states.map((state, i) => ({
     id: state,
-    data: { label: state, isStart: state === startState, isAccept: acceptStates.includes(state) },
+    data: {
+      label: state,
+      isStart: state === startState,
+      isAccept: acceptStates.includes(state),
+    },
     position: { x: i * 150, y: 100 },
   }));
   const edges = [];
@@ -24,14 +28,22 @@ export function automataToGraph(automata) {
     for (const symbol in transitions[from]) {
       const targets = transitions[from][symbol];
       const toList = Array.isArray(targets) ? targets : [targets];
-      toList.forEach((to) => edges.push({ id: `${from}-${to}-${symbol}`, source: from, target: to, label: symbol }));
+      toList.forEach((to) =>
+        edges.push({
+          id: `${from}-${to}-${symbol}`,
+          source: from,
+          target: to,
+          label: symbol,
+        }),
+      );
     }
   }
   return { nodes, edges };
 }
 
 export const regexToNFA = (regex) => post("/automata/regex-to-nfa", { regex });
-export const nfaToDFA = (automata) => post("/automata/nfa-to-dfa", { automata });
+export const nfaToDFA = (automata) =>
+  post("/automata/nfa-to-dfa", { automata });
 export const minimizeDFA = (dfa) => post("/automata/minimize-dfa", dfa);
 export const generateCode = (dfa) => post("/automata/generate-code", dfa);
 export const tokenize = (input) => post("/lexer/tokenize", { input });
